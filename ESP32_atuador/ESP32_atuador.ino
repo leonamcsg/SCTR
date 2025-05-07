@@ -8,7 +8,7 @@
 
 // Replace with your network credentials
 const char* backup_wifi_ssid = "***********";
-const char* backup_wifi_password = "***********";;
+const char* backup_wifi_password = "***********";
 
 #define TEMPO_OTA 1000 // Intervalo para ArduinoOTA.handle()
 #define TEMPO_PACOTE_LENTO 5000
@@ -108,69 +108,64 @@ void setup() {
     udp.onPacket([](AsyncUDPPacket packet) {
       String myString = (const char*)packet.data();
 
-      if (myString.startsWith("CALMA")) {
-        uri = "3306/1";
-        intervalo_pacote = TEMPO_PACOTE_LENTO;
-      } else {
-        // Tenta analisar a mensagem como JSON
-        StaticJsonDocument<50> doc;
-        DeserializationError error = deserializeJson(doc, myString);
-        if (error) {
-          Serial.println("Erro ao analisar JSON recebido.");
-          return;
-        }
-        // Verifica o valor do campo "URI"
-        const char* uriReceived = doc["URI"];
-        if (strcmp(uriReceived,"200/20")==0) {
-          // Reseta o timer ao receber o comando StillAlive
-          timerWrite(timer, 0);  //reset timer (feed watchdog)
-        } else if (strcmp(uriReceived,"100/10")==0) {
-          if (idAtuador == doc["idAtuador"]) {
-            int comando = doc["comando"];
-            String response;
-            switch (comando) {
-            case 1:
-              Serial.println("Turning on relay");
-              digitalWrite(26, LOW);
-              digitalWrite(33, LOW);
-              digitalWrite(4, LOW);
-              uri = "3306/2";
-              response = montarResponse();
-              udp.broadcastTo(response.c_str(), 12345);
-              pacoteCount++;
-              intervalo_pacote = TEMPO_PACOTE_RAPIDO;
-              break;
-            case 0:
-              Serial.println("Turning off relay");
-              digitalWrite(4, HIGH);
-              digitalWrite(26, HIGH);
-              digitalWrite(33, HIGH);
-              uri = "3306/2";
-              response = montarResponse();
-              udp.broadcastTo(response.c_str(), 12345);
-              pacoteCount++;
-              intervalo_pacote = TEMPO_PACOTE_RAPIDO;
-              break;
-            default:
-              break;
-            }
+      // Tenta analisar a mensagem como JSON
+      StaticJsonDocument<50> doc;
+      DeserializationError error = deserializeJson(doc, myString);
+      if (error) {
+        Serial.println("Erro ao analisar JSON recebido.");
+        return;
+      }
+      // Verifica o valor do campo "URI"
+      const char* uriReceived = doc["URI"];
+      if (strcmp(uriReceived,"200/20")==0) {
+        // Reseta o timer ao receber o comando StillAlive
+        timerWrite(timer, 0);  //reset timer (feed watchdog)
+      } else if (strcmp(uriReceived,"100/10")==0) {
+        if (idAtuador == doc["idAtuador"]) {
+          int comando = doc["comando"];
+          String response;
+          switch (comando) {
+          case 1:
+            Serial.println("Turning on relay");
+            digitalWrite(26, LOW);
+            digitalWrite(33, LOW);
+            digitalWrite(4, LOW);
+            uri = "3306/2";
+            response = montarResponse();
+            udp.broadcastTo(response.c_str(), 12345);
+            pacoteCount++;
+            intervalo_pacote = TEMPO_PACOTE_RAPIDO;
+            break;
+          case 0:
+            Serial.println("Turning off relay");
+            digitalWrite(4, HIGH);
+            digitalWrite(26, HIGH);
+            digitalWrite(33, HIGH);
+            uri = "3306/2";
+            response = montarResponse();
+            udp.broadcastTo(response.c_str(), 12345);
+            pacoteCount++;
+            intervalo_pacote = TEMPO_PACOTE_RAPIDO;
+            break;
+          default:
+            break;
           }
-        } else if (strcmp(uriReceived,"100/11")==0) {
-          if (idAtuador == doc["idAtuador"]) {
-            const char* param = doc["parametro"];
-            if (strcmp(param, "CALMA") == 0) {
-              float valor = doc["valor"];
-              if (valor > 0.0) {
-                intervalo_pacote = TEMPO_PACOTE_LENTO;
-                uri = "3306/1";
-              }
-            } else if (strcmp(param, "WATCHDOG") == 0) {
-              float valor = doc["valor"];
-              if (valor > 5000.0) {
-                Serial.printf("Atualizando o tempo do timer watchdog para %.2f ms.\n", valor);
-                timerAlarm(timer, valor * 1000, false, 0);  // Atualiza o tempo do alarme em microsegundos
-                timerWrite(timer, 0);  // Reinicia o timer
-              }
+        }
+      } else if (strcmp(uriReceived,"100/11")==0) {
+        if (idAtuador == doc["idAtuador"]) {
+          const char* param = doc["parametro"];
+          if (strcmp(param, "CALMA") == 0) {
+            float valor = doc["valor"];
+            if (valor > 0.0) {
+              intervalo_pacote = TEMPO_PACOTE_LENTO;
+              uri = "3306/1";
+            }
+          } else if (strcmp(param, "WATCHDOG") == 0) {
+            float valor = doc["valor"];
+            if (valor > 5000.0) {
+              Serial.printf("Atualizando o tempo do timer watchdog para %.2f ms.\n", valor);
+              timerAlarm(timer, valor * 1000, false, 0);  // Atualiza o tempo do alarme em microsegundos
+              timerWrite(timer, 0);  // Reinicia o timer
             }
           }
         }
